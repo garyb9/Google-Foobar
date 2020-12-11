@@ -59,10 +59,3 @@ def solution(n):
                 else:
                     N += 1
         step += 1
-
-
-for n in range(1, 1100):
-    k = solution(n)
-    if type(k) != str:
-        print("gay")
-    print(n, k)

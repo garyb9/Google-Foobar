@@ -1,103 +1,71 @@
-def zeros_matrix(rows, cols):
-    A = []
-    for i in range(rows):
-        A.append([])
-        for j in range(cols):
-            A[-1].append(0.0)
-
-    return A
-
-def matrix_multiply(A,B):
-    rowsA = len(A)
-    colsA = len(A[0])
-
-    rowsB = len(B)
-    colsB = len(B[0])
-
-    C = zeros_matrix(rowsA, colsB)
-
-    for i in range(rowsA):
-        for j in range(colsB):
-            total = 0
-            for ii in range(colsA):
-                total += A[i][ii] * B[ii][j]
-            C[i][j] = total
-
-    return C
-
-def transposeMatrix(m):
-    trans = m.copy()
-    for i in range(len(m)):
-        for j in range(len(m[0])):
-            trans[j][i] = m[i][j]
-    return trans
-
-def getMatrixMinor(m, i, j):
-    return [row[:j] + row[j+1:] for row in (m[:i]+m[i+1:])]
-
-def getMatrixDeternminant(m):
-    #base case for 2x2 matrix
-    if len(m) == 2:
-        return m[0][0]*m[1][1]-m[0][1]*m[1][0]
-
-    determinant = 0
-    for c in range(len(m)):
-        determinant += ((-1)**c)*m[0][c]*getMatrixDeternminant(getMatrixMinor(m, 0, c))
-    return determinant
-
-def getMatrixInverse(m):
-    determinant = getMatrixDeternminant(m)
-    #special case for 2x2 matrix:
-    if len(m) == 2:
-        return [[m[1][1]/determinant, -1*m[0][1]/determinant],
-                [-1*m[1][0]/determinant, m[0][0]/determinant]]
-
-    #find matrix of cofactors
-    cofactors = []
-    for r in range(len(m)):
-        cofactorRow = []
-        for c in range(len(m)):
-            minor = getMatrixMinor(m,r,c)
-            cofactorRow.append(((-1)**(r+c)) * getMatrixDeternminant(minor))
-        cofactors.append(cofactorRow)
-    cofactors = transposeMatrix(cofactors)
-    for r in range(len(cofactors)):
-        for c in range(len(cofactors)):
-            cofactors[r][c] = cofactors[r][c]/determinant
-    return cofactors
+import math
+import numpy as np
+from fractions import Fraction
 
 def solution(m):
     # Your code here
-    # algorithm will calculate =>  w = v(I - A)^-1
+    if len(m) == 1:
+        return [1, 1]
 
-    # find A
-    A = m.copy()
+    # find A - probability matrix, TR - terminal states vector, ABS - absorbing states vector
+    A = np.array(m).astype(float)
+    TR = []
+    ABS = []
     for state in range(len(A)):
-        sumState = sum(A[state])
+        sumState = float(sum(A[state]))
         if sumState:
-            for p in range(len(A[state])):
-                A[state][p] /= sumState
-
-    # find initial state vector v
-    v = [[]]
-    for state in range(len(A)):
-        if state == 0:
-            v[0].append(1)
+            A[state] = A[state] / sumState
+            TR.append(state)
         else:
-            v[0].append(0)
+            ABS.append(state)
 
-    # find (I - A)
-    subMat = A.copy()
-    for state in range(len(A)):
-        for p in range(len(A)):
-            if state == p:
-                A[state][p] = 1 - A[state][p]
-            else:
-                A[state][p] = - A[state][p]
+    shapeA = len(A)  # must be a square matrix
 
-    subMatInv = getMatrixInverse(subMat)
-    w = matrix_multiply(v, subMatInv)
-    return w
+    # find fundamental matrix P
+    #            TR  ABS
+    #       TR  | Q | R |
+    # P  =  ABS | O | I |
+    qShape = len(TR)
+    Q = np.zeros((qShape, qShape))
+    rShape = len(ABS)
+    R = np.zeros((qShape, rShape))
+
+    for row in range(shapeA):
+        if row in TR:
+            qRow = []
+            rRow = []
+            for col in range(shapeA):
+                if col in TR:
+                    qRow.append(A[row][col])
+                else:
+                    rRow.append(A[row][col])
+            Q[row] = qRow
+            R[row] = rRow
+
+    # find N = (I - Q)^-1
+    IQ = np.identity(qShape) - Q
+    N = np.linalg.inv(IQ)
+
+    # find B = NR
+    B = np.matmul(N, R)
+
+    # since S0 is the only initial state, we should only parse B[0]
+    nominators = []
+    denominators = []
+    for val in B[0]:
+        nominators.append(Fraction(val).limit_denominator().numerator)
+        denominators.append(Fraction(val).limit_denominator().denominator)
+    # find the least common denominator
+    lcd = 1
+    for d in denominators:
+        lcd = abs(lcd * d) // math.gcd(lcd, d)
+
+    # rearrange nominators, add lcd and return
+    for idx in range(len(nominators)):
+        nominators[idx] = nominators[idx] * int(lcd/denominators[idx])
+    nominators.append(lcd)
+
+    return nominators
 
 print(solution([
     [0, 1, 0, 0, 0, 1],
@@ -115,38 +83,3 @@ print(solution([
     [0, 0, 0, 0, 0],
     [0, 0, 0, 0, 0]
 ]))
-
-"""
-# find inverse of (I - A)
-    n = len(subMat)
-    subMatInv = subMat.copy()
-    indices = list(range(n))
-    for fd in range(n):
-        fdScaler = 1.0 / subMatInv[fd][fd]
-        for j in range(n):
-            subMatInv[fd][j] *= fdScaler
-        for i in indices[0:fd] + indices[fd + 1:]:
-            crScaler = subMatInv[i][fd]
-            for j in range(n):
-                subMatInv[i][j] = subMatInv[i][j] - crScaler * subMatInv[fd][j]
-
-    # multiply v and (I-A)^-1 to find w
-    w = [[]]
-    for row in range(len(v[0])):
-        w[0].append(0)
-
-    rowsA = len(v)
-    colsA = len(v[0])
-
-    rowsB = len(subMatInv)
-    colsB = len(subMatInv[0])
-
-    for i in range(rowsA):
-        for j in range(colsB):
-            total = 0
-            for ii in range(colsA):
-                total += v[i][ii] * subMatInv[ii][j]
-            w[i][j] = total
-
-    return w
-"""

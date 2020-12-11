@@ -23,4 +23,4 @@ def solution(x, y):
 print(solution('4', '7'))  # 4
 print(solution('2', '1'))  # 1
 print(solution('2', '4'))  # impossible
-print(solution('16','5'))
+print(solution('16', '5'))
